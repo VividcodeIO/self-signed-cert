@@ -7,12 +7,14 @@ import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
+import java.security.PrivateKey;
 import java.security.Security;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateException;
 import java.sql.Date;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import org.apache.commons.lang3.tuple.Pair;
 import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
 import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder;
@@ -27,15 +29,16 @@ public class Main {
   public static void main(String[] args)
       throws NoSuchAlgorithmException, CertificateException, NoSuchProviderException, OperatorCreationException, IOException {
     Security.addProvider(new BouncyCastleProvider());
-    Certificate certificate = generateSelfSignedCert("app.example.com");
+    Pair<PrivateKey, Certificate> pair = generateSelfSignedCert("app.example.com");
     JcaPEMWriter writer = new JcaPEMWriter(new PrintWriter(System.out));
-    writer.writeObject(certificate);
+    writer.writeObject(pair.getLeft());
+    writer.writeObject(pair.getRight());
     writer.flush();
   }
 
   private final static String bcProvider = BouncyCastleProvider.PROVIDER_NAME;
 
-  public static Certificate generateSelfSignedCert(String commonName)
+  public static Pair<PrivateKey, Certificate> generateSelfSignedCert(String commonName)
       throws NoSuchProviderException, NoSuchAlgorithmException, OperatorCreationException, CertificateException {
     KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("RSA", bcProvider);
     keyPairGenerator.initialize(2048);
@@ -50,8 +53,9 @@ public class Main {
     JcaX509v3CertificateBuilder certBuilder = new JcaX509v3CertificateBuilder(
         dnName, certSerialNumber, Date.from(startDate), Date.from(endDate), dnName,
         keyPair.getPublic());
-    return new JcaX509CertificateConverter().setProvider(bcProvider)
+    Certificate certificate = new JcaX509CertificateConverter().setProvider(bcProvider)
         .getCertificate(certBuilder.build(contentSigner));
+    return Pair.of(keyPair.getPrivate(), certificate);
   }
 }
 

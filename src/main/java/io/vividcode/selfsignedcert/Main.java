@@ -1,0 +1,57 @@
+package io.vividcode.selfsignedcert;
+
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.math.BigInteger;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
+import java.security.NoSuchAlgorithmException;
+import java.security.NoSuchProviderException;
+import java.security.Security;
+import java.security.cert.Certificate;
+import java.security.cert.CertificateException;
+import java.sql.Date;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import org.bouncycastle.asn1.x500.X500Name;
+import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
+import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder;
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
+import org.bouncycastle.openssl.jcajce.JcaPEMWriter;
+import org.bouncycastle.operator.ContentSigner;
+import org.bouncycastle.operator.OperatorCreationException;
+import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
+
+public class Main {
+
+  public static void main(String[] args)
+      throws NoSuchAlgorithmException, CertificateException, NoSuchProviderException, OperatorCreationException, IOException {
+    Security.addProvider(new BouncyCastleProvider());
+    Certificate certificate = generateSelfSignedCert("app.example.com");
+    JcaPEMWriter writer = new JcaPEMWriter(new PrintWriter(System.out));
+    writer.writeObject(certificate);
+    writer.flush();
+  }
+
+  private final static String bcProvider = BouncyCastleProvider.PROVIDER_NAME;
+
+  public static Certificate generateSelfSignedCert(String commonName)
+      throws NoSuchProviderException, NoSuchAlgorithmException, OperatorCreationException, CertificateException {
+    KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("RSA", bcProvider);
+    keyPairGenerator.initialize(2048);
+    KeyPair keyPair = keyPairGenerator.generateKeyPair();
+    X500Name dnName = new X500Name("CN=" + commonName);
+    BigInteger certSerialNumber = BigInteger.valueOf(System.currentTimeMillis());
+    String signatureAlgorithm = "SHA256WithRSA";
+    ContentSigner contentSigner = new JcaContentSignerBuilder(signatureAlgorithm)
+        .build(keyPair.getPrivate());
+    Instant startDate = Instant.now();
+    Instant endDate = startDate.plus(2 * 365, ChronoUnit.DAYS);
+    JcaX509v3CertificateBuilder certBuilder = new JcaX509v3CertificateBuilder(
+        dnName, certSerialNumber, Date.from(startDate), Date.from(endDate), dnName,
+        keyPair.getPublic());
+    return new JcaX509CertificateConverter().setProvider(bcProvider)
+        .getCertificate(certBuilder.build(contentSigner));
+  }
+}
+
